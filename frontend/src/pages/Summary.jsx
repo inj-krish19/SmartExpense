@@ -4,7 +4,7 @@ import { API_URL } from "../config";
 import { useTheme } from "../context/ThemeContext";
 import Loader from '../components/Loader'
 
-const Review = () => {
+const Summary = () => {
   const [user, setUser] = useState(null);
   const [summary, setSummary] = useState([]);
   const [error, setError] = useState(null);
@@ -214,4 +214,4 @@ const Review = () => {
   );
 };
 
-export default Review;
+export default Summary;
