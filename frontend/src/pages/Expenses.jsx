@@ -82,16 +82,17 @@ const Expenses = () => {
     // 🧩 Case 3: String — try parsing in common formats
     const parsed = dayjs(dateValue, ["DD-MM-YYYY", "MM/DD/YYYY", "YYYY-MM-DD"], true);
     if (parsed.isValid()) {
-      return parsed.format("DD-MM-YYYY");
+      return parsed.format("YYYY-MM-DD");
     }
 
     // 🧩 Case 4: Fallback — attempt native parsing
     const parsedDate = new Date(dateValue);
     if (!isNaN(parsedDate)) {
-      return dayjs(parsedDate).format("DD-MM-YYYY");
+      return dayjs(parsedDate).format("YYYY-MM-DD");
     }
 
     // 🧩 Case 5: Invalid input — just return raw
+
     return dateValue;
   };
 
@@ -217,6 +218,9 @@ const Expenses = () => {
       return;
     }
 
+    manualEntry['date'] = dayjs(manualEntry.date).format("DD-MM-YYYY");
+    console.log(manualEntry)
+
     const newEntry = {
       cate_id: categories.indexOf(manualEntry.category.toLowerCase()) + 1,
       category: manualEntry.category,
@@ -230,8 +234,11 @@ const Expenses = () => {
   };
 
   const handleSubmit = async () => {
+    console.log("Handling the click");
+
     if (!expenseData.length) {
       setError("No valid expense data to submit.");
+      console.log("No valid expense data to submit.");
       return;
     }
 
@@ -240,16 +247,26 @@ const Expenses = () => {
     setLoading(true);
 
     try {
+      // 🧩 Correctly reformat each expense date for backend (YYYY-MM-DD)
+      const expenses = expenseData.map((exp) => {
+        const parts = exp.expense_date.split("-"); // e.g., ["31", "10", "2025"]
+        return {
+          ...exp,
+          expense_date: `${parts[2]}-${parts[1]}-${parts[0]}`, // "2025-10-31"
+        };
+      });
 
-      console.log("Sending this data", expenseData)
+      console.log("Sending this data", expenses);
 
       const res = await fetch(`${API_URL}/expense/add_bulk`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: user.id, expenses: expenseData }),
+        body: JSON.stringify({ user_id: user.id, expenses }),
       });
 
       const data = await res.json();
+      console.log("Response:", data);
+
       if (data.success) {
         setSuccess("Expenses submitted successfully! Redirecting...");
         setTimeout(() => navigate("/summary", { replace: true }), 2000);
@@ -263,6 +280,7 @@ const Expenses = () => {
       setLoading(false);
     }
   };
+
 
   if (loading) return <Loader />;
 
