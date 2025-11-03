@@ -5,6 +5,7 @@ from datetime import datetime
 from flask import Blueprint, jsonify, request
 from psycopg2.extras import RealDictCursor
 from config.db import get_connection
+from models.expense_model import get_all_expenses
 
 dashboard_bp = Blueprint("dashboard", __name__, url_prefix="/dashboard")
 
@@ -347,5 +348,292 @@ def review_summary(user_id):
 
     except Exception as e:
         print("❌ Error in /dashboard/review:", str(e))
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+# ==============================
+# 📊 YEARLY EXPENSE COMPARISON ROUTE
+# ==============================
+@dashboard_bp.route("/yearly-expense/<int:user_id>")
+def get_yearly_expense_comparison(user_id):
+    try:
+        year = int(request.args.get("year") or datetime.now().year)
+
+        # Fetch all expenses with category names
+        expense_df = fetch_dataframe(
+            """
+            SELECT e.amount, e.expense_date, c.name AS category_name
+            FROM expense e
+            INNER JOIN category c ON e.cate_id = c.id
+            WHERE e.user_id = %s
+            AND EXTRACT(YEAR FROM e.expense_date) = %s
+            """,
+            (user_id, year)
+        )
+
+        if expense_df.empty:
+            return jsonify({
+                "success": True,
+                "year": year,
+                "data": [],
+                "message": f"No expense data found for {year}."
+            }), 200
+
+        # Convert and group data
+        expense_df["expense_date"] = pd.to_datetime(expense_df["expense_date"])
+        expense_df["month"] = expense_df["expense_date"].dt.month
+        expense_df["amount"] = expense_df["amount"].astype(float)
+
+        monthly_group = (
+            expense_df.groupby(["month", "category_name"])["amount"]
+            .sum()
+            .reset_index()
+            .sort_values(["month", "amount"], ascending=[True, False])
+        )
+
+        formatted_data = []
+        for month in sorted(monthly_group["month"].unique()):
+            month_df = monthly_group[monthly_group["month"] == month]
+
+            formatted_data.append({
+                "month": int(month),  # ✅ Convert numpy.int32 → native int
+                "total_expenses": float(month_df["amount"].sum()),  # ✅ native float
+                "categories": [
+                    {
+                        "name": str(row["category_name"]),
+                        "amount": float(row["amount"])  # ✅ convert each amount
+                    }
+                    for _, row in month_df.iterrows()
+                ]
+            })
+
+        # ✅ Convert all data to pure Python types before jsonify
+        response = {
+            "success": True,
+            "year": int(year),
+            "data": formatted_data
+        }
+
+        return jsonify(response), 200
+
+    except Exception as e:
+        print("❌ Error in /yearly-expense:", str(e))
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+# ==============================
+# 📊 1️⃣ COMPARE TWO MONTHS (EARNING vs EXPENSE)
+# ==============================
+@dashboard_bp.route("/compare-months/<int:user_id>")
+def compare_two_months(user_id):
+    """
+    Compare total earning and total expenses between two months.
+    Query params:
+      - month1
+      - month2
+      - year (optional)
+    """
+    try:
+        year = int(request.args.get("year") or datetime.now().year)
+        month1 = int(request.args.get("month1"))
+        month2 = int(request.args.get("month2"))
+
+        # Fetch earning and expense for both months
+        df = fetch_dataframe(
+            """
+            SELECT
+                'earning' AS type, amount, earning_date AS date
+            FROM earning
+            WHERE user_id = %s AND EXTRACT(YEAR FROM earning_date) = %s
+              AND EXTRACT(MONTH FROM earning_date) IN (%s, %s)
+            UNION ALL
+            SELECT
+                'expense' AS type, amount, expense_date AS date
+            FROM expense
+            WHERE user_id = %s AND EXTRACT(YEAR FROM expense_date) = %s
+              AND EXTRACT(MONTH FROM expense_date) IN (%s, %s)
+            """,
+            (user_id, year, month1, month2, user_id, year, month1, month2)
+        )
+
+        if df.empty:
+            return jsonify({"success": True, "data": [], "message": "No data found"}), 200
+
+        df["date"] = pd.to_datetime(df["date"])
+        df["month"] = df["date"].dt.month
+        df["amount"] = df["amount"].astype(float)
+
+        grouped = df.groupby(["type", "month"])["amount"].sum().reset_index()
+
+        comparison = {
+            "months": [month1, month2],
+            "earning": [],
+            "expense": []
+        }
+        for m in [month1, month2]:
+            e = grouped.query("type == 'earning' and month == @m")["amount"].sum()
+            x = grouped.query("type == 'expense' and month == @m")["amount"].sum()
+            comparison["earning"].append(float(e))
+            comparison["expense"].append(float(x))
+
+        return jsonify({"success": True, "year": year, "comparison": comparison}), 200
+
+        # 💬 Suggested Chart: Bar chart → x: [month1, month2], y: earning & expense bars side-by-side
+
+    except Exception as e:
+        print("❌ Error in /compare-months:", str(e))
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+# ==============================
+# 📈 2️⃣ CUMULATIVE MONTHLY EXPENSE TREND
+# ==============================
+@dashboard_bp.route("/cumulative-expenses/<int:user_id>")
+def cumulative_month_expense(user_id):
+    """
+    Returns cumulative expenses month-by-month for a selected year.
+    Useful for trend line charts.
+    """
+    try:
+        year = int(request.args.get("year") or datetime.now().year)
+
+        df = fetch_dataframe(
+            """
+            SELECT amount, expense_date
+            FROM expense
+            WHERE user_id = %s AND EXTRACT(YEAR FROM expense_date) = %s
+            """,
+            (user_id, year)
+        )
+
+        if df.empty:
+            return jsonify({"success": True, "year": year, "data": []}), 200
+
+        df["expense_date"] = pd.to_datetime(df["expense_date"])
+        df["month"] = df["expense_date"].dt.month
+        df["amount"] = df["amount"].astype(float)
+
+        month_sum = df.groupby("month")["amount"].sum().reset_index()
+        month_sum["cumulative"] = month_sum["amount"].cumsum()
+
+        result = {
+            "x": month_sum["month"].astype(int).tolist(),
+            "y": month_sum["cumulative"].astype(float).tolist()
+        }
+
+        return jsonify({"success": True, "year": year, "cumulative_expense": result}), 200
+
+        # 💬 Suggested Chart: Line chart → x: month, y: cumulative_expense (increasing trend)
+
+    except Exception as e:
+        print("❌ Error in /cumulative-expenses:", str(e))
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+# ==============================
+# 🧾 3️⃣ CATEGORY COMPARISON PER MONTH
+# ==============================
+@dashboard_bp.route("/compare-categories/<int:user_id>")
+def compare_expense_categories(user_id):
+    """
+    Compare expense distribution across months by category.
+    """
+    try:
+        year = int(request.args.get("year") or datetime.now().year)
+
+        df = fetch_dataframe(
+            """
+            SELECT e.amount, e.expense_date, c.name AS category_name
+            FROM expense e
+            INNER JOIN category c ON e.cate_id = c.id
+            WHERE e.user_id = %s AND EXTRACT(YEAR FROM e.expense_date) = %s
+            """,
+            (user_id, year)
+        )
+
+        if df.empty:
+            return jsonify({"success": True, "data": [], "message": "No expenses found"}), 200
+
+        df["expense_date"] = pd.to_datetime(df["expense_date"])
+        df["month"] = df["expense_date"].dt.month
+        df["amount"] = df["amount"].astype(float)
+
+        grouped = (
+            df.groupby(["month", "category_name"])["amount"]
+            .sum()
+            .reset_index()
+            .sort_values(["month", "amount"], ascending=[True, False])
+        )
+
+        data = []
+        for month in sorted(grouped["month"].unique()):
+            month_df = grouped[grouped["month"] == month]
+            data.append({
+                "month": int(month),
+                "categories": [
+                    {"name": str(row["category_name"]), "amount": float(row["amount"])}
+                    for _, row in month_df.iterrows()
+                ]
+            })
+
+        return jsonify({"success": True, "year": year, "data": data}), 200
+
+        # 💬 Suggested Chart: Stacked Bar Chart or Grouped Bar Chart
+        # x: month, y: amount, color/group by category_name
+
+    except Exception as e:
+        print("❌ Error in /compare-categories:", str(e))
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+# ==============================
+# 📉 4️⃣ TOP CATEGORIES OVER YEAR
+# ==============================
+@dashboard_bp.route("/top-categories/<int:user_id>")
+def get_top_expense_categories(user_id):
+    """
+    Returns top 5 categories with the highest total expense in a year.
+    """
+    try:
+        year = int(request.args.get("year") or datetime.now().year)
+
+        df = fetch_dataframe(
+            """
+            SELECT e.amount, c.name AS category_name
+            FROM expense e
+            INNER JOIN category c ON e.cate_id = c.id
+            WHERE e.user_id = %s AND EXTRACT(YEAR FROM e.expense_date) = %s
+            """,
+            (user_id, year)
+        )
+
+        if df.empty:
+            return jsonify({"success": True, "data": []}), 200
+
+        df["amount"] = df["amount"].astype(float)
+        top_cats = (
+            df.groupby("category_name")["amount"]
+            .sum()
+            .reset_index()
+            .sort_values("amount", ascending=False)
+            .head(5)
+        )
+
+        result = {
+            "x": top_cats["category_name"].tolist(),
+            "y": top_cats["amount"].astype(float).tolist()
+        }
+
+        return jsonify({"success": True, "year": year, "top_categories": result}), 200
+
+        # 💬 Suggested Chart: Horizontal Bar Chart → x: amount, y: category_name
+
+    except Exception as e:
+        print("❌ Error in /top-categories:", str(e))
         traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
