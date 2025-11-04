@@ -648,7 +648,7 @@ const Dashboard = () => {
             {/* Right Section */}
             <div className="flex flex-wrap gap-2 justify-start md:justify-end">
               <button
-                onClick={() => navigate("/earning-input")}
+                onClick={() => navigate("/earning")}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium border 
                 transition-all duration-200 hover:scale-105
                 ${isDarkMode
@@ -683,7 +683,20 @@ const Dashboard = () => {
                   }`}
               >
                 <i className="bi bi-clipboard-check me-1"></i>
-                Review Data
+                Summary
+              </button>
+
+              <button
+                onClick={() => navigate("/comparison")}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium border 
+                transition-all duration-200 hover:scale-105
+                ${isDarkMode
+                    ? "border-yellow-500 text-yellow-400 hover:bg-yellow-600 hover:text-white"
+                    : "border-yellow-600 text-yellow-600 hover:bg-yellow-600 hover:text-white"
+                  }`}
+              >
+                <i className="bi bi-calendar me-1"></i>
+                Comparison
               </button>
 
               <button
