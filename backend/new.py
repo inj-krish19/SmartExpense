@@ -1,4 +1,3 @@
-from india_housing_datasets import fetch_ahmedabad_housing
-dataset = fetch_ahmedabad_housing()
-
-print(dataset['data'])
+import jwt
+token = jwt.encode({"user_id": 1}, "secret", algorithm="HS256")
+print(token)

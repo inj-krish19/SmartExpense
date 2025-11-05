@@ -77,11 +77,13 @@ def google_auth():
 
         print("✅ Google User Info:", user_info)
 
+        user = handle_google_user(user_info)
         return jsonify({
             "success": True,
             "message": "Successfully connected with Google",
             "google_user": user_info,
             "token": access_token,
+            "user": user
         }), 200
 
     except Exception as e:
@@ -91,7 +93,7 @@ def google_auth():
             "error": "Unable to connect with Google",
             "details": str(e)
         }), 500
-    
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))  # Use Render's PORT
     app.run(host="0.0.0.0", port=port, debug=True)
