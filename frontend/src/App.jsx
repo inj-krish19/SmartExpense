@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 // Components
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
+import Success from './pages/Success';
 import BackToTop from './components/BackToTop';
 
 // Pages (ensure exact filenames)
@@ -42,6 +43,7 @@ function App() {
                 <Route path="/signup" element={<Signup />} />
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/login" element={<Login />} />
+                <Route path="/success" element={<Success />} />
                 <Route path="/track-info" element={<Information />} />
                 <Route path="/summary" element={<Summary />} />   {/* ✅ Added Review route */}
               </Routes>
