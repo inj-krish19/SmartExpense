@@ -1,8 +1,9 @@
 import traceback
-import os, requests
-from flask import Blueprint, request, jsonify
-from models.users_model import create_users_table, insert_user, find_user_by_email_and_password
+import os, requests, datetime, jwt
+from flask import Blueprint, request, jsonify, redirect
+from models.users_model import create_users_table, insert_user, find_user_by_email_and_password, handle_google_user
 from config.db import get_connection
+from urllib.parse import urlencode
 from psycopg2.extras import RealDictCursor
 
 auth_bp = Blueprint("auth", __name__)
@@ -13,6 +14,18 @@ create_users_table()
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "SOMECLIENTID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "SOMECLIENTSECRET")
 GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "SOMEDUMMYURL")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173/")
+SECRET_KEY = os.getenv("SECRET_KEY", "dontcopythissecretitsriskyyk")
+
+
+def create_jwt_token(user):
+    payload = {
+        "id": user["id"],
+        "email": user["email"],
+        "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=24)
+    }
+    token = jwt.encode(payload, SECRET_KEY, algorithm="HS256")
+    return token
 
 
 @auth_bp.route("/profile/<int:user_id>", methods=["GET"])
@@ -161,12 +174,14 @@ def google_auth():
 
         print("✅ Google User Info:", user_info)
 
-        return jsonify({
-            "success": True,
-            "message": "Successfully connected with Google",
-            "google_user": user_info,
-            "token": access_token,
-        }), 200
+        user = handle_google_user(user_info)
+        token = create_jwt_token(user)
+
+        # Build redirect URL
+        params = urlencode({
+            "token": token
+        })
+        return redirect(f"{FRONTEND_URL}/success?{params}")
 
     except Exception as e:
         print("Error in redirection uri:", str(e))
@@ -175,7 +190,67 @@ def google_auth():
             "error": "Unable to connect with Google",
             "details": str(e)
         }), 500
-    
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))  # Use Render's PORT
-    app.run(host="0.0.0.0", port=port, debug=True)
+
+def get_user_from_token(token):
+    """
+    Decodes the given JWT token and returns the corresponding user object.
+    """
+    try:
+        # Decode the JWT token
+        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        user_id = payload.get("id")
+
+        if not user_id:
+            raise ValueError("Invalid token: missing user_id")
+
+        # Fetch user from database
+        conn = get_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute("""
+            SELECT id, email, username, phone, bio
+            FROM users
+            WHERE id = %s
+        """, (user_id,))
+        user = cursor.fetchone()
+        conn.close()
+
+        if not user:
+            raise ValueError("User not found")
+
+        print("✅ Decoded user:", user)
+        return dict(user)  # Convert RealDictRow → dict safely
+
+    except jwt.ExpiredSignatureError:
+        print("❌ Token expired")
+        return None
+    except jwt.InvalidTokenError:
+        print("❌ Invalid token")
+        return None
+    except Exception as e:
+        print("❌ Error decoding token:", str(e))
+        return None
+
+
+@auth_bp.route("/verify-token", methods=["GET"])
+def verify_token():
+    """Verifies the JWT and returns the user info."""
+    try:
+        token = request.headers.get("Authorization")
+
+        if not token:
+            return jsonify({"success": False, "error": "Missing token"}), 400
+
+        # Remove "Bearer " prefix if present
+        if token.startswith("Bearer "):
+            token = token.split(" ")[1]
+
+        user = get_user_from_token(token)
+
+        if not user:
+            return jsonify({"success": False, "error": "Invalid or expired token"}), 401
+
+        return jsonify({"success": True, "user": user}), 200
+
+    except Exception as e:
+        print("❌ Error in /verify-token:", str(e))
+        return jsonify({"success": False, "error": str(e)}), 500
