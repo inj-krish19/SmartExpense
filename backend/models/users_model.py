@@ -1,4 +1,6 @@
-from config.db import get_connection
+from config.db import get_connection, RealDictCursor
+from werkzeug.security import generate_password_hash
+import random, string
 
 def create_users_table():
     conn = get_connection()
@@ -63,3 +65,40 @@ def find_user_by_email_and_password(email, password):
     user = cursor.fetchone()
     conn.close()
     return user
+
+def handle_google_user(user_info, ):
+
+    db_conn = get_connection()
+
+    email = user_info.get("email")
+    name = user_info.get("name") or email.split("@")[0]
+    picture = user_info.get("picture", "")
+    bio = f"Google account user - {name}"
+
+    if not email:
+        raise ValueError("Email not found in Google user info")
+
+    with db_conn.cursor(cursor_factory=RealDictCursor) as cur:
+        # Check if user exists
+        cur.execute("SELECT * FROM users WHERE email = %s", (email,))
+        user = cur.fetchone()
+
+        if user:
+            print(f"✅ Existing user logged in: {email}")
+            return user  # Already registered user
+
+        # Create a random dummy password (Google accounts don't use local login)
+        hashed_pass = "9700"
+
+        # Insert new user
+        cur.execute("""
+            INSERT INTO users (email, username, phone, password, bio)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING id, email, username, bio
+        """, (email, name, None, hashed_pass, bio))
+
+        new_user = cur.fetchone()
+        db_conn.commit()
+
+        print(f"🆕 New user created from Google: {email}")
+        return new_user
