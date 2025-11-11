@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { API_URL } from "../config";
+import { useUser } from "../context/UserContext";
 
 const Success = () => {
+    const { login } = useUser();
     const navigate = useNavigate();
     const location = useLocation();
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    
 
     useEffect(() => {
         const handleGoogleSuccess = async () => {
@@ -40,7 +43,7 @@ const Success = () => {
                 }
 
                 // 🧍 Store verified user in localStorage
-                localStorage.setItem("user", JSON.stringify(data.user));
+                login(data.user);
 
                 // ✅ Redirect after 3 seconds
                 setTimeout(() => navigate("/dashboard"), 3000);
@@ -51,6 +54,8 @@ const Success = () => {
                 setLoading(false);
             }
         };
+
+        
 
         handleGoogleSuccess();
     }, [location, navigate]);
