@@ -7,7 +7,7 @@ import { API_URL, CLIENT_ID } from "../config";
 const Login = () => {
   const navigate = useNavigate();
   const { login } = useUser();
-  const REDIRECT_URI = `${API_URL}/google-callback`
+  const REDIRECT_URI = `${API_URL}/auth/google-callback`
 
   console.log(REDIRECT_URI)
 
@@ -55,7 +55,7 @@ const Login = () => {
   const handleGoogleLogin = async () => {
     try {
 
-      let url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${CLIENT_ID}&access_type=offline&redirect_uri=http://localhost:5000/auth/google-callback&response_type=code&scope=https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email `
+      let url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${CLIENT_ID}&access_type=offline&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email `
 
       console.log("URL", url)
 
