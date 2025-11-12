@@ -25,6 +25,8 @@ import { UserProvider } from './context/UserContext';
 // Styles
 import './App.css';
 import Information from './pages/Information';
+import Predict from './pages/Predict';
+import Recommend from './pages/Predict';
 
 function App() {
   return (
@@ -46,6 +48,8 @@ function App() {
                 <Route path="/success" element={<Success />} />
                 <Route path="/track-info" element={<Information />} />
                 <Route path="/summary" element={<Summary />} />   {/* ✅ Added Review route */}
+                <Route path="/predict" element={<Predict />} />   {/* ✅ Added Review route */}
+                <Route path="/recommend" element={<Recommend />} />   {/* ✅ Added Review route */}
               </Routes>
             </main>
             <Footer />
