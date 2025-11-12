@@ -71,12 +71,12 @@ const Expenses = () => {
     // 🧩 Case 1: Excel serial date (number)
     if (typeof dateValue === "number") {
       const jsDate = excelDateToJSDate(dateValue);
-      return dayjs(jsDate).format("MM-DD-YYYY");
+      return dayjs(jsDate).format("DD-MM-YYYY");
     }
 
     // 🧩 Case 2: Already a Date object
     if (dateValue instanceof Date) {
-      return dayjs(dateValue).format("MM-DD-YYYY");
+      return dayjs(dateValue).format("DD-MM-YYYY");
     }
 
     // 🧩 Case 3: String — try parsing in common formats

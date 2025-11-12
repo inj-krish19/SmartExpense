@@ -31,7 +31,6 @@ def fetch_dataframe(query, params=()):
             rows = cursor.fetchall()
             return pd.DataFrame(rows)
     except Exception as e:
-        print("❌ Database Fetch Error:", str(e))
         traceback.print_exc()
         return pd.DataFrame()  # Return empty DataFrame on failure
     finally:
@@ -109,7 +108,6 @@ def get_summary(user_id):
         })
 
     except Exception as e:
-        print("❌ Error in /summary:", str(e))
         traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -252,8 +250,6 @@ def get_charts(user_id):
         return jsonify({"success": True, "charts": charts})
 
     except Exception as e:
-        # detailed error log for server side debugging; frontend receives safe JSON
-        print("❌ Error in /charts:", str(e))
         traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -347,14 +343,11 @@ def review_summary(user_id):
         return jsonify({"success": True, "year": year, "summary": summary}), 200
 
     except Exception as e:
-        print("❌ Error in /dashboard/review:", str(e))
         traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
 
 
-# ==============================
-# 📊 YEARLY EXPENSE COMPARISON ROUTE
-# ==============================
+# YEARLY EXPENSE COMPARISON ROUTE
 @dashboard_bp.route("/yearly-expense/<int:user_id>")
 def get_yearly_expense_comparison(user_id):
     try:
@@ -418,14 +411,11 @@ def get_yearly_expense_comparison(user_id):
         return jsonify(response), 200
 
     except Exception as e:
-        print("❌ Error in /yearly-expense:", str(e))
         traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
 
 
-# ==============================
-# 📊 1️⃣ COMPARE TWO MONTHS (EARNING vs EXPENSE)
-# ==============================
+# COMPARE TWO MONTHS (EARNING vs EXPENSE)
 @dashboard_bp.route("/compare-months/<int:user_id>")
 def compare_two_months(user_id):
     """
@@ -483,7 +473,6 @@ def compare_two_months(user_id):
         # 💬 Suggested Chart: Bar chart → x: [month1, month2], y: earning & expense bars side-by-side
 
     except Exception as e:
-        print("❌ Error in /compare-months:", str(e))
         traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -529,14 +518,11 @@ def cumulative_month_expense(user_id):
         # 💬 Suggested Chart: Line chart → x: month, y: cumulative_expense (increasing trend)
 
     except Exception as e:
-        print("❌ Error in /cumulative-expenses:", str(e))
         traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
 
 
-# ==============================
-# 🧾 3️⃣ CATEGORY COMPARISON PER MONTH
-# ==============================
+# CATEGORY COMPARISON PER MONTH
 @dashboard_bp.route("/compare-categories/<int:user_id>")
 def compare_expense_categories(user_id):
     """
@@ -586,7 +572,6 @@ def compare_expense_categories(user_id):
         # x: month, y: amount, color/group by category_name
 
     except Exception as e:
-        print("❌ Error in /compare-categories:", str(e))
         traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -634,6 +619,231 @@ def get_top_expense_categories(user_id):
         # 💬 Suggested Chart: Horizontal Bar Chart → x: amount, y: category_name
 
     except Exception as e:
-        print("❌ Error in /top-categories:", str(e))
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@dashboard_bp.route("/expense-alerts/<int:user_id>")
+def expense_alerts(user_id):
+    """
+    Returns months where expenses exceeded earnings.
+    """
+    try:
+        year = int(request.args.get("year") or datetime.now().year)
+
+        earning_df = fetch_dataframe(
+            """
+            SELECT amount, earning_date
+            FROM earning
+            WHERE user_id = %s AND EXTRACT(YEAR FROM earning_date) = %s
+            """,
+            (user_id, year)
+        )
+
+        expense_df = fetch_dataframe(
+            """
+            SELECT amount, expense_date
+            FROM expense
+            WHERE user_id = %s AND EXTRACT(YEAR FROM expense_date) = %s
+            """,
+            (user_id, year)
+        )
+
+        earn_group = aggregate_monthly(earning_df, "earning_date", "amount").rename(columns={"amount": "total_earning"})
+        exp_group = aggregate_monthly(expense_df, "expense_date", "amount").rename(columns={"amount": "total_expenses"})
+
+        summary = pd.merge(earn_group, exp_group, on=["year", "month"], how="outer").fillna(0)
+
+        alerts = []
+        for _, row in summary.iterrows():
+            if row["total_expenses"] > row["total_earning"]:
+                alerts.append({
+                    "year": int(row["year"]),
+                    "month": int(row["month"]),
+                    "total_earning": float(row["total_earning"]),
+                    "total_expenses": float(row["total_expenses"])
+                })
+
+        return jsonify({"success": True, "year": year, "alerts": alerts}), 200
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+    
+@dashboard_bp.route("/average-expense/<int:user_id>")
+def average_monthly_expense(user_id):
+    """
+    Returns the average monthly expense for the selected year.
+    """
+    try:
+        year = int(request.args.get("year") or datetime.now().year)
+
+        expense_df = fetch_dataframe(
+            """
+            SELECT amount, expense_date
+            FROM expense
+            WHERE user_id = %s AND EXTRACT(YEAR FROM expense_date) = %s
+            """,
+            (user_id, year)
+        )
+
+        if expense_df.empty:
+            return jsonify({"success": True, "year": year, "average_monthly_expense": 0.0}), 200
+
+        expense_df["expense_date"] = pd.to_datetime(expense_df["expense_date"])
+        expense_df["month"] = expense_df["expense_date"].dt.month
+        expense_df["amount"] = expense_df["amount"].astype(float)
+
+        monthly_sum = expense_df.groupby("month")["amount"].sum().reset_index()
+        average_expense = monthly_sum["amount"].mean()
+
+        return jsonify({"success": True, "year": year, "average_monthly_expense": float(average_expense)}), 200
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+    
+@dashboard_bp.route("/predicted-expense/<int:user_id>")
+def predict_expense(user_id):
+    """
+    Returns predicted expense for the selected year's all month based on linear regression of past monthly existing expense.
+    and also do this prediction based on the salary of the month and dont find then take average salary of the year and predict based on that.
+    """
+    try:
+        from sklearn.linear_model import LinearRegression
+        import numpy as np
+        year = int(request.args.get("year") or datetime.now().year)
+
+        expense_df = fetch_dataframe(
+            """
+            SELECT amount, expense_date
+            FROM expense
+            WHERE user_id = %s AND EXTRACT(YEAR FROM expense_date) = %s
+            """,
+            (user_id, year)
+        )
+
+        if expense_df.empty:
+            return jsonify({"success": True, "year": year, "predicted_expenses": []}), 200
+
+        expense_df["expense_date"] = pd.to_datetime(expense_df["expense_date"])
+        expense_df["month"] = expense_df["expense_date"].dt.month
+        expense_df["amount"] = expense_df["amount"].astype(float)
+
+        monthly_sum = expense_df.groupby("month")["amount"].sum().reset_index()
+
+        # Prepare data for linear regression
+        X = monthly_sum["month"].values.reshape(-1, 1)
+        y = monthly_sum["amount"].values
+
+        model = LinearRegression()
+        model.fit(X, y)
+
+        earnings = fetch_dataframe(
+            """
+            SELECT amount, earning_date
+            FROM earning
+            WHERE user_id = %s AND EXTRACT(YEAR FROM earning_date) = %s
+            """,
+            (user_id, year)
+        )
+
+        if not earnings.empty:
+            earnings["earning_date"] = pd.to_datetime(earnings["earning_date"])
+            earnings["month"] = earnings["earning_date"].dt.month
+            earnings["amount"] = earnings["amount"].astype(float)
+
+            monthly_earnings = earnings.groupby("month")["amount"].sum().reset_index()
+            avg_salary = monthly_earnings["amount"].mean()
+        else:
+            avg_salary = 0.0
+        
+        # Predict expenses for all 12 months
+        predicted_expenses = []
+        for month in range(1, 13):
+            predicted = model.predict(np.array([[month]]))[0]
+            # Adjust prediction based on average salary
+            if avg_salary > 0:
+                predicted = min(predicted, avg_salary * 0.8)  # Assume expenses should not exceed 80% of salary
+            predicted_expenses.append(predicted)
+
+        return jsonify({
+            "success": True,
+            "year": year,
+            "expenses": monthly_sum.set_index("month")["amount"].to_dict(),
+            "predicted_expenses": [float(pred) for pred in predicted_expenses]
+        }), 200
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+    
+@dashboard_bp.route("/recommented-categories/<int:user_id>")
+def recommend_categories(user_id):
+    """
+    Returns recommended categories for the selected year based on k cluster analysis of past expenses of 3 months 
+    on last month * 60, last 2 months * 25, last 3 months * 15.
+    """
+    try:
+        from sklearn.cluster import KMeans
+        import numpy as np
+
+        year = int(request.args.get("year") or datetime.now().year)
+
+        expense_df = fetch_dataframe(
+            """
+            SELECT amount, expense_date, cate_id
+            FROM expense
+            WHERE user_id = %s AND EXTRACT(YEAR FROM expense_date) = %s
+            """,
+            (user_id, year)
+        )
+
+        if expense_df.empty:
+            return jsonify({"success": True, "year": year, "recommended_categories": []}), 200
+
+        expense_df["expense_date"] = pd.to_datetime(expense_df["expense_date"])
+        expense_df["month"] = expense_df["expense_date"].dt.month
+        expense_df["amount"] = expense_df["amount"].astype(float)
+
+        monthly_sum = expense_df.groupby(["month", "cate_id"])["amount"].sum().reset_index()
+
+        # Prepare data for k-means clustering
+        last_month = monthly_sum[monthly_sum["month"] == 12]
+        last_2_months = monthly_sum[monthly_sum["month"].isin([11, 12])].groupby("cate_id")["amount"].sum().reset_index()
+        last_3_months = monthly_sum[monthly_sum["month"].isin([10, 11, 12])].groupby("cate_id")["amount"].sum().reset_index()
+
+        merged = pd.merge(last_month, last_2_months, on="cate_id", how="outer", suffixes=('_1', '_2'))
+        merged = pd.merge(merged, last_3_months, on="cate_id", how="outer")
+        merged.rename(columns={"amount": "amount_3"}, inplace=True)
+        merged.fillna(0, inplace=True)
+
+        # Weights: last month * 60, last 2 months * 25, last 3 months * 15
+        X = merged[["amount_1", "amount_2", "amount_3"]].values
+        weights = np.array([60, 25, 15])
+        X_weighted = X * weights
+
+        kmeans = KMeans(n_clusters=3, random_state=0).fit(X_weighted)
+        merged["cluster"] = kmeans.labels_
+
+        # Get categories from the cluster with highest average expense
+        cluster_means = merged.groupby("cluster")[["amount_1", "amount_2", "amount_3"]].mean().sum(axis=1)
+        top_cluster = cluster_means.idxmax()
+        recommended_categories = merged[merged["cluster"] == top_cluster]["cate_id"].tolist()
+
+        category_names = fetch_dataframe(
+            """
+            SELECT id, name
+            FROM category
+            WHERE id = ANY(%s)
+            """,
+            (recommended_categories,)
+        )
+
+        return jsonify({
+            "success": True,
+            "year": year,
+            "recommended_categories": category_names["name"].tolist()
+        }), 200
+
+    except Exception as e:
         traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500

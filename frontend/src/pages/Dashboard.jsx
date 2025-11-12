@@ -365,13 +365,17 @@ const Dashboard = () => {
         <h3 className="text-2xl font-semibold text-sky-600 dark:text-teal-400">{months[month - 1]} - {year}</h3>
 
         <div className="flex flex-wrap items-center justify-center gap-3">
-          <button className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-purple-700 text-white font-medium shadow-md hover:shadow-lg active:scale-95 transition">
+          <button className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-purple-700 text-white font-medium shadow-md hover:shadow-lg active:scale-95 transition"
+            onClick={() => { navigate("/predict") }}
+          >
             <i className="bi bi-stars text-rose-300"></i>
             Predict
           </button>
 
-          <button className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-rose-600 to-pink-700 text-white font-medium shadow-md hover:shadow-lg active:scale-95 transition">
-            <i className="bi bi-lightbulb text-yellow-300"></i>
+          <button className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-rose-600 to-pink-700 text-white font-medium shadow-md hover:shadow-lg active:scale-95 transition"
+            onClick={() => { navigate("/recommend") }}
+          >
+            <i className="bi bi-lightbulb text-violet-300"></i>
             Recommend
           </button>
 
