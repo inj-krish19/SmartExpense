@@ -142,7 +142,7 @@ const Earning = () => {
 
       const results = await Promise.all(promises.filter(Boolean));
       await Promise.all(results.map(r => r));
-      setSuccess("earning saved successfully!");
+      setSuccess("Earning saved successfully!");
     } catch (err) {
       console.error(err);
       setError("Server error.");
@@ -196,7 +196,7 @@ const Earning = () => {
 
           <div className="max-w-md mx-auto">
             <button type="submit" className="w-full py-3 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-md transition-colors">
-              Save Annual earning
+              Save Annual arning
             </button>
           </div>
         </form>

@@ -26,7 +26,7 @@ import { UserProvider } from './context/UserContext';
 import './App.css';
 import Information from './pages/Information';
 import Predict from './pages/Predict';
-import Recommend from './pages/Predict';
+import Recommend from './pages/Recommendations';
 
 function App() {
   return (
