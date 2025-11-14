@@ -23,17 +23,17 @@ def all_expenses():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
-@expense_bp.route("/delete")
-def delete_expenses():
+# @expense_bp.route("/delete")
+# def delete_expenses():
 
-    month = int( request.args.get("month") or datetime.datetime.now().month )
-    year = int( request.args.get("year") or datetime.datetime.now().year )
+#     month = int( request.args.get("month") or datetime.datetime.now().month )
+#     year = int( request.args.get("year") or datetime.datetime.now().year )
 
-    try:
-        expenses = delete_expenses()
-        return jsonify({"success": True, "expenses": expenses}), 200
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
+#     try:
+#         expenses = delete_expenses()
+#         return jsonify({"success": True, "expenses": expenses}), 200
+#     except Exception as e:
+#         return jsonify({"success": False, "error": str(e)}), 500
 
 @expense_bp.route("/monthly", methods=["POST"])
 def monthly_expenses():
@@ -102,6 +102,8 @@ def add_bulk_expenses():
             print(cate_id, amount, expense_date)
             if not cate_id or not user_id or not amount or not expense_date:
                 print({"success": False, "error": "All fields required for each expense"})
+                print(cate_id, amount, expense_date)
+
                 return jsonify({"success": False, "error": "All fields required for each expense"}), 400
 
             expense_date = str(expense_date)
@@ -145,6 +147,155 @@ def expenses_by_month():
         conn.close()
 
         return jsonify({"success": True, "expenses": expenses}), 200
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+    
+@expense_bp.route("/delete", methods=["GET", "DELETE"])
+def delete_expenses_route():
+    """
+    GET     → Preview the expenses that will be deleted
+    DELETE  → Delete all expenses for given month/year
+    Query Params: ?user_id=1&month=1&year=2025
+    """
+    try:
+        user_id = request.args.get("user_id", type=int)
+        month = request.args.get("month", type=int)
+        year = request.args.get("year", type=int)
+
+        if not user_id:
+            return jsonify({"success": False, "error": "user_id is required"}), 400
+
+        # Defaults
+        if not month:
+            month = datetime.datetime.now().month
+        if not year:
+            year = datetime.datetime.now().year
+
+        from config.db import get_connection
+        from psycopg2.extras import RealDictCursor
+
+        conn = get_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+        # First fetch the rows of this month/year
+        cursor.execute("""
+            SELECT e.id, e.amount, e.expense_date, e.created_at,
+                   c.name AS category_name, c.id AS cate_id
+            FROM expense e
+            JOIN category c ON e.cate_id = c.id
+            WHERE e.user_id = %s
+              AND EXTRACT(MONTH FROM e.expense_date) = %s
+              AND EXTRACT(YEAR FROM e.expense_date) = %s
+            ORDER BY e.expense_date ASC;
+        """, (user_id, month, year))
+
+        expenses_to_delete = cursor.fetchall()
+
+        # If GET → return preview only
+        if request.method == "GET":
+            conn.close()
+            return jsonify({
+                "success": True,
+                "preview": True,
+                "message": f"{len(expenses_to_delete)} expenses will be deleted for {month}/{year}",
+                "expenses": expenses_to_delete
+            }), 200
+
+        # If DELETE → perform deletion
+        if request.method == "DELETE":
+            cursor.execute("""
+                DELETE FROM expense
+                WHERE user_id = %s
+                  AND EXTRACT(MONTH FROM expense_date) = %s
+                  AND EXTRACT(YEAR FROM expense_date) = %s
+            """, (user_id, month, year))
+
+            deleted_count = cursor.rowcount
+            conn.commit()
+            conn.close()
+
+            return jsonify({
+                "success": True,
+                "deleted": deleted_count,
+                "message": f"Deleted {deleted_count} expenses for {month}/{year}"
+            }), 200
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@expense_bp.route("/yearly", methods=["GET", "DELETE"])
+def yearly_expenses():
+    """
+    GET     → Preview all expenses for a full year (NO deletion)
+    DELETE  → Delete all expenses for that year
+
+    Query Params: ?user_id=1&year=2025
+    If year not provided → defaults to current year.
+    """
+    try:
+        user_id = request.args.get("user_id", type=int)
+        year = request.args.get("year", type=int)
+
+        if not user_id:
+            return jsonify({"success": False, "error": "user_id is required"}), 400
+
+        # Default to current year
+        if not year:
+            year = datetime.datetime.now().year
+
+        from config.db import get_connection
+        from psycopg2.extras import RealDictCursor
+
+        conn = get_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+        # Fetch all expenses for the year
+        cursor.execute("""
+            SELECT e.id, e.amount, e.expense_date, e.created_at,
+                   c.name AS category_name, c.id AS cate_id
+            FROM expense e
+            JOIN category c ON e.cate_id = c.id
+            WHERE EXTRACT(YEAR FROM e.expense_date) = %s
+              AND e.user_id = %s
+            ORDER BY e.expense_date ASC;
+        """, (year, user_id))
+
+        expenses = cursor.fetchall()
+
+        # ============================
+        #          GET → PREVIEW
+        # ============================
+        if request.method == "GET":
+            conn.close()
+            return jsonify({
+                "success": True,
+                "preview": True,
+                "message": f"{len(expenses)} expenses will be affected for year {year}",
+                "year": year,
+                "expenses": expenses
+            }), 200
+
+        # ============================
+        #        DELETE → EXECUTE
+        # ============================
+        if request.method == "DELETE":
+            cursor.execute("""
+                DELETE FROM expense
+                WHERE user_id = %s
+                  AND EXTRACT(YEAR FROM expense_date) = %s
+            """, (user_id, year))
+
+            deleted_count = cursor.rowcount
+            conn.commit()
+            conn.close()
+
+            return jsonify({
+                "success": True,
+                "deleted": deleted_count,
+                "message": f"Deleted {deleted_count} expenses for year {year}"
+            }), 200
 
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
