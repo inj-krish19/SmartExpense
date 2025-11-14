@@ -11,6 +11,8 @@ import BackToTop from './components/BackToTop';
 import Home from './pages/Home';
 import Earning from './pages/Earning';
 import Expenses from './pages/Expenses';
+import DeleteExpenses from './pages/DeleteExpenses';
+import DeleteEarnings from './pages/DeleteEarnings';
 import Dashboard from './pages/Dashboard';
 import About from './pages/About';
 import Login from './pages/Login';
@@ -40,6 +42,8 @@ function App() {
                 <Route path="/" element={<Home />} />
                 <Route path="/earning" element={<Earning />} />
                 <Route path="/expenses" element={<Expenses />} />
+                <Route path="/delete-earnings" element={<DeleteEarnings />} />
+                <Route path="/delete-expenses" element={<DeleteExpenses />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/about" element={<About />} />
                 <Route path="/signup" element={<Signup />} />
@@ -47,9 +51,9 @@ function App() {
                 <Route path="/login" element={<Login />} />
                 <Route path="/success" element={<Success />} />
                 <Route path="/track-info" element={<Information />} />
-                <Route path="/summary" element={<Summary />} />   {/* ✅ Added Review route */}
-                <Route path="/predict" element={<Predict />} />   {/* ✅ Added Review route */}
-                <Route path="/recommend" element={<Recommend />} />   {/* ✅ Added Review route */}
+                <Route path="/summary" element={<Summary />} />   
+                <Route path="/predict" element={<Predict />} />   
+                <Route path="/recommend" element={<Recommend />} />
               </Routes>
             </main>
             <Footer />

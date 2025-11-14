@@ -27,7 +27,7 @@ const Navbar = () => {
   // Auth-dependent links
   const authLinks = !user
     ? [
-      { path: "/signup", label: "SignUp" },
+      { path: "/signup", label: "Sign Up" },
       { path: "/login", label: "Login" },
     ]
     : [
