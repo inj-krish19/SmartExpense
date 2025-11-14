@@ -15,7 +15,7 @@ python-dotenv
 idna
 requests
 urllib3
-psycopg2
+psycopg2-binary
 numpy
 pandas
 scikit-learn
@@ -27,3 +27,4 @@ pytz
 tzdata
 six
 pycparser
+
