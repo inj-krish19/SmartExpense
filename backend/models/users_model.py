@@ -58,6 +58,17 @@ def find_user_by_email(email):
     conn.close()
     return user
 
+def get_email(user_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT email FROM users WHERE id = %s;", (user_id,))
+    row = cursor.fetchone()
+    conn.close()
+
+    print("Email", row['email'] if row else None)
+    return row["email"] if row else None
+
+
 def find_user_by_email_and_password(email, password):
     conn = get_connection()
     cursor = conn.cursor()
