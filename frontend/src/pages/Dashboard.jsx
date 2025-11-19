@@ -51,6 +51,68 @@ const Dashboard = () => {
     return Array.from({ length: current - start + 1 }, (_, i) => start + i);
   }, []);
 
+
+
+
+  // Download CSV Report
+  const downloadCSV = async () => {
+    try {
+      const res = await fetch(`${API_URL}/dashboard/download-monthly-report/${user.id}`);
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "monthly-expense-report.csv";
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("CSV Download Failed:", err);
+    }
+  }
+
+
+  const downloadPDF = async () => {
+    try {
+      const res = await fetch(`${API_URL}/dashboard/download-report-pdf/${user.id}`);
+
+      if (!res.ok) {
+        throw new Error("PDF download failed");
+      }
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "monthly-expense-report.pdf";
+      a.click();
+
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Download PDF Failed:", err);
+      alert("Error downloading PDF report");
+    }
+  }
+
+
+
+  // Email PDF Report
+  const sendPDF = async () => {
+    try {
+      const res = await fetch(`${API_URL}/dashboard/email-report-pdf/${user.id}`, {
+        method: "POST"
+      });
+      const data = await res.json();
+      alert(data.message || "PDF Sent To Your Email");
+    } catch (err) {
+      console.error("PDF Email Failed:", err);
+    }
+  }
+
+
+
+
   // fetch function - safe and uses AbortController
   const fetchDashboardData = useCallback(async (uid, y, m, controller) => {
     setLoading(true);
@@ -365,6 +427,32 @@ const Dashboard = () => {
         <h3 className="text-2xl font-semibold text-sky-600 dark:text-teal-400">{months[month - 1]} - {year}</h3>
 
         <div className="flex flex-wrap items-center justify-center gap-3">
+          
+          <button
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-sky-600 to-teal-700 text-white font-medium shadow-md hover:shadow-lg active:scale-95 transition"
+            onClick={ () => { downloadCSV() }}
+          >
+            <i className="bi bi-filetype-csv text-yellow-200"></i>
+            Download CSV
+          </button>
+
+          <button
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-700 text-white font-medium shadow-md hover:shadow-lg active:scale-95 transition"
+            onClick={ () => { downloadPDF() }}
+          >
+            <i className="bi bi-file-earmark-pdf text-red-300"></i>
+            Download PDF
+          </button>
+
+          <button
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-green-700 text-white font-medium shadow-md hover:shadow-lg active:scale-95 transition"
+            onClick={ () => { sendPDF() }}
+          >
+            <i className="bi bi-envelope-paper text-lime-200"></i>
+            Email PDF Report
+          </button>
+
+          
           <button className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-purple-700 text-white font-medium shadow-md hover:shadow-lg active:scale-95 transition"
             onClick={() => { navigate("/predict") }}
           >
