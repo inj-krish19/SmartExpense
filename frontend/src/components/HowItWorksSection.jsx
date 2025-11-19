@@ -5,7 +5,7 @@ const HowItWorksSection = () => {
   const steps = [
     {
       number: 1,
-      title: "Add Monthly earning",
+      title: "Add Monthly Earning",
       description:
         "Enter your monthly earning amount. Simple one-time setup for each month to track your income.",
     },

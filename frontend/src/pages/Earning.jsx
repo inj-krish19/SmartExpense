@@ -142,7 +142,7 @@ const Earning = () => {
 
       const results = await Promise.all(promises.filter(Boolean));
       await Promise.all(results.map(r => r));
-      setSuccess("earning saved successfully!");
+      setSuccess("Earning saved successfully!");
     } catch (err) {
       console.error(err);
       setError("Server error.");
@@ -162,17 +162,41 @@ const Earning = () => {
           <p className="text-gray-600 dark:text-gray-400">Plan your annual earning dynamically</p>
         </div>
 
-        <div className="max-w-md mx-auto mb-8">
-          <label className="block mb-2 font-semibold">Select Year:</label>
-          <input
-            type="number"
-            min="2000"
-            max={new Date().getFullYear() + 5}
-            value={year}
-            onChange={handleYearChange}
-            className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+        {/* Year + Delete Earnings Row */}
+        <div className="max-w-md mx-auto mb-8 flex flex-col sm:flex-row gap-4">
+
+          {/* Year Input */}
+          <div className="flex-1">
+            <label className="block mb-2 font-semibold text-gray-800 dark:text-gray-200">
+              Select Year:
+            </label>
+
+            <input
+              type="number"
+              min="2000"
+              max={new Date().getFullYear() + 5}
+              value={year}
+              onChange={handleYearChange}
+              className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700
+              bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-200
+              focus:outline-none focus:ring-2 focus:ring-teal-500 dark:focus:ring-sky-400"
+            />
+          </div>
+
+          {/* Delete Earning Button */}
+          <div className="flex items-end w-full sm:w-auto">
+            <button
+              className="w-full sm:w-auto py-3 px-6 bg-red-600 hover:bg-red-700
+              text-white font-bold rounded-lg shadow-md transition-all"
+              onClick={() => navigate("/delete-earnings")}
+            >
+              Delete Earnings
+            </button>
+          </div>
+
         </div>
+
+
 
         <form onSubmit={handleSubmit}>
           <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-6">
@@ -194,9 +218,9 @@ const Earning = () => {
           {error && <div className="text-red-500 mb-4 text-center font-semibold">{error}</div>}
           {success && <div className="text-green-500 mb-4 text-center font-semibold">{success}</div>}
 
-          <div className="max-w-md mx-auto">
+          <div className="max-w-md mx-auto flex flex-col sm:flex-row gap-4">
             <button type="submit" className="w-full py-3 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-md transition-colors">
-              Save Annual earning
+              Save Annual Earning
             </button>
           </div>
         </form>

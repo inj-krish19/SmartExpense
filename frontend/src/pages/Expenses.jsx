@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import Loader from "../components/Loader";
 import dayjs from "dayjs";
 import { API_URL } from "../config";
+import InteractiveLoader from "../components/InteractiveLoader";
 
 const Expenses = () => {
   const { isDarkMode } = useTheme();
@@ -282,7 +283,19 @@ const Expenses = () => {
   };
 
 
-  if (loading) return <Loader />;
+  if (loading)
+  return (
+    <InteractiveLoader
+      messages={[
+        "Verifying delete request...",
+        "Checking data integrity...",
+        "Removing selected entries...",
+        "Updating your dashboard...",
+        "We're almost there..."
+      ]}
+    />
+  );
+
 
   return (
     <div className={`min-h-screen py-8 px-4 sm:px-6 lg:px-8 ${isDarkMode ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}>
@@ -369,6 +382,12 @@ const Expenses = () => {
 
         {/* Submit */}
         <div className="flex justify-end gap-3">
+          <button
+            onClick={() => navigate("/delete-expenses")}
+            className="px-4 py-2 border rounded-md bg-red-200 dark:bg-red-700"
+          >
+            Delete Expenses
+          </button>
           <button
             onClick={() => navigate("/earning")}
             className="px-4 py-2 border rounded-md bg-gray-200 dark:bg-gray-700"

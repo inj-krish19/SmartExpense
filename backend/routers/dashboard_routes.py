@@ -2,12 +2,29 @@
 import traceback
 import pandas as pd
 from datetime import datetime
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, Response
 from psycopg2.extras import RealDictCursor
 from config.db import get_connection
+import io, os
 from models.expense_model import get_all_expenses
+from models.users_model import get_email
+
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet
+
+import smtplib
+from email.message import EmailMessage
+SMTP_SERVER = os.getenv("EMAIL_HOST", "smtp.example.com")
+SMTP_PORT = int(os.getenv("EMAIL_PORT", 587))
+APP_EMAIL = os.getenv("EMAIL_FROM", "youremail@example.com")
+APP_PASSWORD = os.getenv("EMAIL_PASSWORD", "your-app-password")
 
 dashboard_bp = Blueprint("dashboard", __name__, url_prefix="/dashboard")
+
+
+
 
 # =========================================================
 # =============== HELPER UTILITIES =========================
@@ -843,6 +860,335 @@ def recommend_categories(user_id):
             "year": year,
             "recommended_categories": category_names["name"].tolist()
         }), 200
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+    
+
+@dashboard_bp.route("/download-monthly-report/<int:user_id>")
+def download_monthly_report(user_id):
+    """
+    Generates a CSV report for the user's current month:
+    - All expenses
+    - All salaries/earnings
+    - Summary (total expense, total earnings, net balance)
+    """
+    try:
+        now = datetime.now()
+        year = now.year
+        month = now.month
+
+        # Fetch expenses
+        expense_df = fetch_dataframe(
+            """
+            SELECT e.expense_date, c.category_name as category, e.amount
+            FROM expense e
+            INNER JOIN category c ON e.cate_id = c.id
+            WHERE user_id = %s 
+              AND EXTRACT(YEAR FROM e.expense_date) = %s
+              AND EXTRACT(MONTH FROM e.expense_date) = %s
+            ORDER BY e.expense_date ASC
+            """,
+            (user_id, year, month)
+        )
+
+        # Fetch salary / earnings
+        salary_df = fetch_dataframe(
+            """
+            SELECT earning_date, amount
+            FROM earning
+            WHERE user_id = %s 
+              AND EXTRACT(YEAR FROM earning_date) = %s
+              AND EXTRACT(MONTH FROM earning_date) = %s
+            ORDER BY earning_date ASC
+            """,
+            (user_id, year, month)
+        )
+
+        # Convert amounts to float for safety
+        if not expense_df.empty:
+            expense_df["amount"] = expense_df["amount"].astype(float)
+
+        if not salary_df.empty:
+            salary_df["amount"] = salary_df["amount"].astype(float)
+
+        # Summaries
+        total_expense = expense_df["amount"].sum() if not expense_df.empty else 0
+        total_salary = salary_df["amount"].sum() if not salary_df.empty else 0
+        net_balance = total_salary - total_expense
+
+        # CSV Buffer
+        buffer = io.StringIO()
+
+        buffer.write("Monthly Financial Report\n")
+        buffer.write(f"Year: {year}, Month: {month}\n\n")
+
+        # Earnings Section
+        buffer.write("Earnings\n")
+        if salary_df.empty:
+            buffer.write("No earnings this month\n\n")
+        else:
+            salary_df.rename(columns={
+                "earning_date": "Date",
+                "amount": "Amount"
+            }, inplace=True)
+            salary_df.to_csv(buffer, index=False)
+            buffer.write("\n")
+
+        # Expense Section
+        buffer.write("Expenses\n")
+        if expense_df.empty:
+            buffer.write("No expenses this month\n\n")
+        else:
+            expense_df.rename(columns={
+                "expense_date": "Date",
+                "category": "Category",
+                "amount": "Amount"
+            }, inplace=True)
+            expense_df.to_csv(buffer, index=False)
+            buffer.write("\n")
+
+        # Summary Section
+        buffer.write("Summary\n")
+        buffer.write(f"Total Earnings, {total_salary}\n")
+        buffer.write(f"Total Expenses, {total_expense}\n")
+        buffer.write(f"Net Balance, {net_balance}\n")
+
+        buffer.seek(0)
+
+        # Return downloadable CSV
+        return Response(
+            buffer.getvalue().encode("utf-8"),
+            mimetype="text/csv",
+            headers={
+                "Content-Disposition": (
+                    f"attachment; filename=monthly_report_{year}_{month}.csv"
+                )
+            }
+        )
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+# helper: generate the PDF bytes for a user for given year/month
+def _build_expense_pdf_bytes(user_id: int, year: int | None = None, month: int | None = None):
+    """
+    Returns PDF bytes containing:
+      - Table A: Current-month (or requested month) category-wise expenses
+      - Table B: Yearly month-wise totals + salary for each month
+    """
+    try:
+        # defaults
+        now = datetime.now()
+        if year is None:
+            year = now.year
+        if month is None:
+            month = now.month
+
+        # --- Fetch category breakdown for requested month ---
+        expense_month_df = fetch_dataframe(
+            """
+            SELECT c.name AS category_name, SUM(e.amount)::numeric AS total_amount
+            FROM expense e
+            INNER JOIN category c ON e.cate_id = c.id
+            WHERE e.user_id = %s
+              AND EXTRACT(YEAR FROM e.expense_date) = %s
+              AND EXTRACT(MONTH FROM e.expense_date) = %s
+            GROUP BY c.name
+            ORDER BY total_amount DESC;
+            """,
+            (user_id, year, month)
+        )
+
+        # --- Fetch monthly totals for the year (expenses) ---
+        expense_year_df = fetch_dataframe(
+            """
+            SELECT EXTRACT(MONTH FROM expense_date)::int AS month,
+                   SUM(amount)::numeric AS total_expense
+            FROM expense
+            WHERE user_id = %s
+              AND EXTRACT(YEAR FROM expense_date) = %s
+            GROUP BY EXTRACT(MONTH FROM expense_date)
+            ORDER BY month;
+            """,
+            (user_id, year)
+        )
+
+        # --- Fetch monthly totals for the year (earnings/salary) ---
+        salary_year_df = fetch_dataframe(
+            """
+            SELECT EXTRACT(MONTH FROM earning_date)::int AS month,
+                   SUM(amount)::numeric AS total_salary
+            FROM earning
+            WHERE user_id = %s
+              AND EXTRACT(YEAR FROM earning_date) = %s
+            GROUP BY EXTRACT(MONTH FROM earning_date)
+            ORDER BY month;
+            """,
+            (user_id, year)
+        )
+
+        # Normalize dataframes and types
+        if expense_month_df is None:
+            expense_month_df = pd.DataFrame(columns=["category_name", "total_amount"])
+        if expense_year_df is None:
+            expense_year_df = pd.DataFrame(columns=["month", "total_expense"])
+        if salary_year_df is None:
+            salary_year_df = pd.DataFrame(columns=["month", "total_salary"])
+
+        # ensure numeric types
+        if not expense_month_df.empty:
+            expense_month_df["total_amount"] = expense_month_df["total_amount"].astype(float)
+        if not expense_year_df.empty:
+            expense_year_df["month"] = expense_year_df["month"].astype(int)
+            expense_year_df["total_expense"] = expense_year_df["total_expense"].astype(float)
+        if not salary_year_df.empty:
+            salary_year_df["month"] = salary_year_df["month"].astype(int)
+            salary_year_df["total_salary"] = salary_year_df["total_salary"].astype(float)
+
+        # Build a combined year dataframe with months 1..12
+        months = list(range(1, 13))
+        year_table_rows = []
+        for m in months:
+            exp_val = float(expense_year_df.loc[expense_year_df["month"] == m, "total_expense"].sum()) \
+                if not expense_year_df.empty else 0.0
+            sal_val = float(salary_year_df.loc[salary_year_df["month"] == m, "total_salary"].sum()) \
+                if not salary_year_df.empty else 0.0
+            year_table_rows.append((m, sal_val, exp_val, sal_val - exp_val))
+
+        # Start PDF creation
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=letter, leftMargin=40, rightMargin=40, topMargin=40, bottomMargin=40)
+        styles = getSampleStyleSheet()
+        elems = []
+
+        # Title
+        title_text = f"Expense Report — {year} / {datetime(year, month, 1).strftime('%B')}"
+        elems.append(Paragraph(title_text, styles["Title"]))
+        elems.append(Spacer(1, 12))
+
+        # Section: Current Month Category-wise Expenses
+        elems.append(Paragraph(f"Category-wise expenses for {datetime(year, month, 1).strftime('%B %Y')}", styles["Heading2"]))
+        table_data = [["Category", "Amount "]]
+        if expense_month_df.empty:
+            table_data.append(["No expenses for this month", "0"])
+        else:
+            for _, r in expense_month_df.iterrows():
+                table_data.append([str(r["category_name"]), f"{float(r['total_amount']):.2f}"])
+
+        tbl = Table(table_data, colWidths=[300, 150])
+        tbl.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+            ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
+            ("BOTTOMPADDING", (0, 0), (-1, 0), 8),
+        ]))
+        elems.append(tbl)
+        elems.append(Spacer(1, 16))
+
+        # Section: Yearly month-wise totals with salary
+        elems.append(Paragraph("Yearly summary (month, salary, expense, net)", styles["Heading2"]))
+        year_table_header = [["Month", "Salary ", "Expenses ", "Net "]]
+        year_table_body = []
+        for (m, s, e, net) in year_table_rows:
+            month_name = datetime(year, m, 1).strftime("%b")
+            year_table_body.append([month_name, f"{s:.2f}", f"{e:.2f}", f"{net:.2f}"])
+
+        year_tbl = Table(year_table_header + year_table_body, colWidths=[80, 120, 120, 120])
+        year_tbl.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+            ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
+            ("BOTTOMPADDING", (0, 0), (-1, 0), 8),
+        ]))
+        elems.append(year_tbl)
+        elems.append(Spacer(1, 16))
+
+        # Summary totals at end
+        total_salary_year = sum([r[1] for r in year_table_rows])
+        total_expense_year = sum([r[2] for r in year_table_rows])
+        total_net = total_salary_year - total_expense_year
+
+        elems.append(Paragraph(f"Total Salary (Year): {total_salary_year:.2f}", styles["Normal"]))
+        elems.append(Paragraph(f"Total Expenses (Year): {total_expense_year:.2f}", styles["Normal"]))
+        elems.append(Paragraph(f"Net (Year): {total_net:.2f}", styles["Normal"]))
+
+        # Build PDF
+        doc.build(elems)
+        buffer.seek(0)
+        return buffer.getvalue()
+
+    except Exception:
+        traceback.print_exc()
+        raise
+
+
+# ===== Route: download PDF for user (returns PDF bytes to frontend) =====
+@dashboard_bp.route("/download-report-pdf/<int:user_id>", methods=["GET"])
+def download_report_pdf(user_id):
+    """
+    GET params (optional):
+      - year (int) (defaults to current year)
+      - month (int) (defaults to current month)
+    Returns: application/pdf as attachment
+    """
+    try:
+        year = request.args.get("year", type=int)
+        month = request.args.get("month", type=int)
+
+        pdf_bytes = _build_expense_pdf_bytes(user_id, year, month)
+
+        filename = f"expense_report_{user_id}_{year or datetime.now().year}_{month or datetime.now().month}.pdf"
+        return Response(
+            pdf_bytes,
+            mimetype="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+        )
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+# ===== Route: generate PDF and send by email (POST) =====
+@dashboard_bp.route("/email-report-pdf/<int:user_id>", methods=["POST"])
+def email_report_pdf(user_id):
+    """
+    POST body JSON:
+      { "email": "user@example.com", "year": 2025, "month": 10 }
+    Generates PDF (same as download) and sends email with PDF attached.
+    """
+    try:
+        receiver = get_email(user_id)
+        year = int(request.args.get("year") or datetime.now().year)
+        month = int(request.args.get("month") or datetime.now().month)
+
+        if not receiver:
+            return jsonify({"success": False, "error": "email is required in body"}), 400
+
+        pdf_bytes = _build_expense_pdf_bytes(user_id, year, month)
+
+        msg = EmailMessage()
+        msg["Subject"] = f"Expense Report for {user_id} — {year or datetime.now().year}"
+        msg["From"] = APP_EMAIL
+        msg["To"] = receiver
+        msg.set_content("Please find attached your expense report (PDF).")
+
+        msg.add_attachment(pdf_bytes, maintype="application", subtype="pdf", filename=f"expense_report_{user_id}.pdf")
+
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as smtp:
+            smtp.starttls()
+            smtp.login(APP_EMAIL, APP_PASSWORD)
+            smtp.send_message(msg)
+
+        print({"success": True, "message": "Report emailed successfully"})
+        return jsonify({"success": True, "message": "Report emailed successfully"}), 200
 
     except Exception as e:
         traceback.print_exc()
