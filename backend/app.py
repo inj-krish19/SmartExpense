@@ -7,7 +7,7 @@ from routers.auth_routes import auth_bp
 from routers.earning_routes import earning_bp
 from routers.category_routes import category_bp
 from routers.expense_router import expense_bp
-from routers.dashboard_routes import dashboard_bp
+from routers.dashboard_routes import dashboard_bp, init_mail
 from models.users_model import find_all_users
 
 load_dotenv()
@@ -26,6 +26,7 @@ app = Flask(__name__)
 
 # Enable CORS for your frontend (Vercel URL or localhost for dev)
 CORS(app)
+init_mail(app)
 
 # Register Blueprints
 app.register_blueprint(auth_bp, url_prefix="/auth")

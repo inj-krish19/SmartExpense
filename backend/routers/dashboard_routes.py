@@ -14,6 +14,8 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
 
+from flask_mail import Message
+
 import smtplib
 from email.message import EmailMessage
 SMTP_SERVER = os.getenv("EMAIL_HOST", "smtp.example.com")
@@ -23,7 +25,19 @@ APP_PASSWORD = os.getenv("EMAIL_PASSWORD", "your-app-password")
 
 dashboard_bp = Blueprint("dashboard", __name__, url_prefix="/dashboard")
 
+from flask_mail import Mail, Message
 
+mail = Mail()   # initialize mail here
+
+def init_mail(app):
+    app.config['MAIL_SERVER'] = SMTP_SERVER
+    app.config['MAIL_PORT'] = SMTP_PORT
+    app.config['MAIL_USE_TLS'] = True
+    app.config['MAIL_USERNAME'] = APP_EMAIL
+    app.config['MAIL_PASSWORD'] = APP_PASSWORD
+    app.config['MAIL_DEFAULT_SENDER'] = ('Expense App', APP_EMAIL)
+
+    mail.init_app(app)
 
 
 # =========================================================
@@ -1159,6 +1173,36 @@ def download_report_pdf(user_id):
 # ===== Route: generate PDF and send by email (POST) =====
 @dashboard_bp.route("/email-report-pdf/<int:user_id>", methods=["POST"])
 def email_report_pdf(user_id):
+    try:
+        receiver_email = get_email(user_id)
+        if not receiver_email:
+            return jsonify({"success": False, "error": "User email not found"}), 404
+
+        pdf_bytes = _build_expense_pdf_bytes(user_id)
+
+        msg = Message(
+            subject="Monthly Expense Report",
+            recipients=[receiver_email],
+            body="Your detailed monthly expense report is attached."
+        )
+
+        msg.attach(
+            "expense_report.pdf",
+            "application/pdf",
+            pdf_bytes
+        )
+
+        mail.send(msg)
+
+        return jsonify({"success": True, "message": "Report sent successfully!"}), 200
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+
+def old_email_report_pdf(user_id):
     """
     POST body JSON:
       { "email": "user@example.com", "year": 2025, "month": 10 }
@@ -1175,7 +1219,7 @@ def email_report_pdf(user_id):
         pdf_bytes = _build_expense_pdf_bytes(user_id, year, month)
 
         msg = EmailMessage()
-        msg["Subject"] = f"Expense Report for {user_id} — {year or datetime.now().year}"
+        msg["Subject"] = f"Expense Report of {year or datetime.now().year}"
         msg["From"] = APP_EMAIL
         msg["To"] = receiver
         msg.set_content("Please find attached your expense report (PDF).")
