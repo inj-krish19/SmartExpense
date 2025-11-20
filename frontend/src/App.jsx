@@ -30,6 +30,14 @@ import Information from './pages/Information';
 import Predict from './pages/Predict';
 import Recommend from './pages/Recommendations';
 
+// Legal Pages
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import RefundPolicy from './pages/RefundPolicy';
+import CookiePolicy from './pages/CookiePolicy';
+import Disclaimer from './pages/Disclaimer';
+import Contact from './pages/Contact';
+import TermsConditions from './pages/TermsCondition';
+
 function App() {
   return (
     <ThemeProvider>
@@ -54,6 +62,15 @@ function App() {
                 <Route path="/summary" element={<Summary />} />   
                 <Route path="/predict" element={<Predict />} />   
                 <Route path="/recommend" element={<Recommend />} />
+
+                {/* Legal Routes */}
+                <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+                <Route path="/refund-policy" element={<RefundPolicy />} />
+                <Route path="/cookie-policy" element={<CookiePolicy />} />
+                <Route path="/disclaimer" element={<Disclaimer />} />
+                <Route path="/terms-conditions" element={<TermsConditions />} />
+                <Route path="/contact" element={<Contact />} />
+
               </Routes>
             </main>
             <Footer />
