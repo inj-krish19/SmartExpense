@@ -14,10 +14,14 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
 
-from flask_mail import Message
-
 import smtplib
 from email.message import EmailMessage
+
+import base64
+import requests
+
+MAIL_MICROSERVICE_URL = os.getenv("MAIL_MICROSERVICE_URL")   # <-- CHANGE THIS
+
 SMTP_SERVER = os.getenv("EMAIL_HOST", "smtp.example.com")
 SMTP_PORT = int(os.getenv("EMAIL_PORT", 587))
 APP_EMAIL = os.getenv("EMAIL_FROM", "youremail@example.com")
@@ -896,7 +900,7 @@ def download_monthly_report(user_id):
         # Fetch expenses
         expense_df = fetch_dataframe(
             """
-            SELECT e.expense_date, c.category_name as category, e.amount
+            SELECT e.expense_date, c.name as category, e.amount
             FROM expense e
             INNER JOIN category c ON e.cate_id = c.id
             WHERE user_id = %s 
@@ -1180,26 +1184,27 @@ def email_report_pdf(user_id):
 
         pdf_bytes = _build_expense_pdf_bytes(user_id)
 
-        msg = Message(
-            subject="Monthly Expense Report",
-            recipients=[receiver_email],
-            body="Your detailed monthly expense report is attached."
-        )
+        # convert bytes → base64 for sending through JSON safely
+        pdf_b64 = base64.b64encode(pdf_bytes).decode("utf-8")
 
-        msg.attach(
-            "expense_report.pdf",
-            "application/pdf",
-            pdf_bytes
-        )
+        # Send to microservice
+        payload = {
+            "email": receiver_email,
+            "filename": "expense_report.pdf",
+            "filedata": pdf_b64
+        }
 
-        mail.send(msg)
+        # Calls to microservice /send route that sends email with attachment
+        resp = requests.post(MAIL_MICROSERVICE_URL + "/send", json=payload)
 
-        return jsonify({"success": True, "message": "Report sent successfully!"}), 200
+        if resp.status_code != 200:
+            return jsonify({"success": False, "error": "Mail microservice failed", "details": resp.text}), 500
+
+        return jsonify({"success": True, "message": "Report emailed successfully!"})
 
     except Exception as e:
         traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
-
 
 
 def old_email_report_pdf(user_id):
