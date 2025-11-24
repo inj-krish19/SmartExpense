@@ -10,6 +10,7 @@ import {
 } from "recharts";
 import { format, parseISO, isValid as isValidDateFn } from "date-fns";
 import Loader from "../components/Loader";
+import Notification from "../components/Notification";
 
 const COLORS = [
   "#8884d8", "#82ca9d", "#ffc658", "#ff8042", "#0088fe",
@@ -39,6 +40,8 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [viewMode, setViewMode] = useState("list");
+  const [notification, setNotification] = useState("");
+
 
   const months = useMemo(() => [
     "January", "February", "March", "April", "May", "June",
@@ -63,11 +66,13 @@ const Dashboard = () => {
 
       const a = document.createElement("a");
       a.href = url;
-      a.download = "monthly-expense-report.csv";
+      a.download = "monthly-report.csv";
       a.click();
-      window.URL.revokeObjectURL(url);
+
+      setNotification("CSV downloaded successfully");
     } catch (err) {
       console.error("CSV Download Failed:", err);
+      setNotification("Failed to download CSV");
     }
   }
 
@@ -89,9 +94,11 @@ const Dashboard = () => {
       a.click();
 
       window.URL.revokeObjectURL(url);
+      
+      setNotification("PDF downloaded successfully");
     } catch (err) {
       console.error("Download PDF Failed:", err);
-      alert("Error downloading PDF report");
+      setNotification("Error downloading PDF report");
     }
   }
 
@@ -104,9 +111,10 @@ const Dashboard = () => {
         method: "POST"
       });
       const data = await res.json();
-      alert(data.message || "PDF Sent To Your Email");
+      setNotification(data.message || "PDF Sent To Your Email");
     } catch (err) {
       console.error("PDF Email Failed:", err);
+      setNotification("Failed to send email");
     }
   }
 
@@ -323,6 +331,8 @@ const Dashboard = () => {
 
   return (
     <div className={`min-h-screen px-6 md:px-12 py-6 transition ${isDarkMode ? "bg-gray-900 text-gray-100" : "bg-gray-50 text-gray-800"}`}>
+      
+      <Notification message={notification} onClose={() => setNotification("")} />
 
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
