@@ -27,8 +27,6 @@ SMTP_PORT = int(os.getenv("EMAIL_PORT", 587))
 APP_EMAIL = os.getenv("EMAIL_FROM", "youremail@example.com")
 APP_PASSWORD = os.getenv("EMAIL_PASSWORD", "your-app-password")
 
-print(APP_EMAIL, SMTP_SERVER)
-
 dashboard_bp = Blueprint("dashboard", __name__, url_prefix="/dashboard")
 
 from flask_mail import Mail, Message
@@ -902,7 +900,7 @@ def download_monthly_report(user_id):
         # Fetch expenses
         expense_df = fetch_dataframe(
             """
-            SELECT e.expense_date, c.category_name as category, e.amount
+            SELECT e.expense_date, c.name as category, e.amount
             FROM expense e
             INNER JOIN category c ON e.cate_id = c.id
             WHERE user_id = %s 
@@ -1196,6 +1194,7 @@ def email_report_pdf(user_id):
             "filedata": pdf_b64
         }
 
+        # Calls to microservice /send route that sends email with attachment
         resp = requests.post(MAIL_MICROSERVICE_URL + "/send", json=payload)
 
         if resp.status_code != 200:
