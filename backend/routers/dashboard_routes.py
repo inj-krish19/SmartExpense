@@ -740,6 +740,134 @@ def average_monthly_expense(user_id):
 @dashboard_bp.route("/predicted-expense/<int:user_id>")
 def predict_expense(user_id):
     """
+    Build a LinearRegression model where:
+      - Independent variable X  = monthly_earning (for months where both earning & expense exist)
+      - Dependent   variable Y  = monthly_expense (for those same months)
+    Train on months that have both values, print X and Y to console,
+    then predict expenses for all 12 months using the model and the month's earnings.
+    """
+    try:
+        from sklearn.linear_model import LinearRegression
+        import numpy as np
+
+        year = int(request.args.get("year") or datetime.now().year)
+
+        # --- Fetch expenses and earnings for the year ---
+        expense_df = fetch_dataframe(
+            """
+            SELECT amount, expense_date
+            FROM expense
+            WHERE user_id = %s AND EXTRACT(YEAR FROM expense_date) = %s
+            """,
+            (user_id, year)
+        )
+
+        earning_df = fetch_dataframe(
+            """
+            SELECT amount, earning_date
+            FROM earning
+            WHERE user_id = %s AND EXTRACT(YEAR FROM earning_date) = %s
+            """,
+            (user_id, year)
+        )
+
+        # Ensure dataframes exist
+        if expense_df is None:
+            expense_df = pd.DataFrame(columns=["amount", "expense_date"])
+        if earning_df is None:
+            earning_df = pd.DataFrame(columns=["amount", "earning_date"])
+
+        # --- Prepare monthly aggregates (months 1..12) ---
+        if not expense_df.empty:
+            expense_df["expense_date"] = pd.to_datetime(expense_df["expense_date"])
+            expense_df["month"] = expense_df["expense_date"].dt.month
+            expense_df["amount"] = expense_df["amount"].astype(float)
+            monthly_expense = expense_df.groupby("month")["amount"].sum().reset_index()
+        else:
+            monthly_expense = pd.DataFrame(columns=["month", "amount"])
+
+        if not earning_df.empty:
+            earning_df["earning_date"] = pd.to_datetime(earning_df["earning_date"])
+            earning_df["month"] = earning_df["earning_date"].dt.month
+            earning_df["amount"] = earning_df["amount"].astype(float)
+            monthly_earning = earning_df.groupby("month")["amount"].sum().reset_index()
+        else:
+            monthly_earning = pd.DataFrame(columns=["month", "amount"])
+
+        # Convert to dicts for return (0 for missing months)
+        # Create full-month Series for earnings and expenses (index 1..12)
+        months = list(range(1, 13))
+
+        exp_map = {int(r["month"]): float(r["amount"]) for _, r in monthly_expense.iterrows()} if not monthly_expense.empty else {}
+        earn_map = {int(r["month"]): float(r["amount"]) for _, r in monthly_earning.iterrows()} if not monthly_earning.empty else {}
+
+        monthly_expense_full = {m: float(exp_map.get(m, 0.0)) for m in months}
+        monthly_earning_full = {m: float(earn_map.get(m, 0.0)) for m in months}
+
+        # --- Build training data: only months where both earning AND expense exist (non-zero) ---
+        X_train_list = []
+        y_train_list = []
+        for m in months:
+            earn_val = monthly_earning_full[m]
+            exp_val = monthly_expense_full[m]
+            # Consider "exist" as having a non-zero value; adjust if you want to include zeros
+            if (earn_val is not None and earn_val != 0) and (exp_val is not None and exp_val != 0):
+                X_train_list.append(earn_val)
+                y_train_list.append(exp_val)
+
+        X_train = np.array(X_train_list).reshape(-1, 1)
+        y_train = np.array(y_train_list)
+
+        # Print X and Y to console as requested
+        print("Training X (monthly earnings) :", X_train_list)
+        print("Training Y (monthly expenses):", y_train_list)
+
+        # If no training samples available, return a helpful message
+        if X_train.shape[0] == 0:
+            return jsonify({
+                "success": True,
+                "year": year,
+                "message": "No months have both earning and expense data to train the model.",
+                "earnings": monthly_earning_full,
+                "expenses": monthly_expense_full,
+                "predicted_expenses": {m: None for m in months}
+            }), 200
+
+        # Train linear regression model
+        model = LinearRegression()
+        model.fit(X_train, y_train)
+
+        # Prepare X_all (earnings for all months). If an earning is 0, use average of available earnings used for training
+        avg_earning_used = float(np.mean(X_train)) if X_train.shape[0] > 0 else 0.0
+        X_all = []
+        for m in months:
+            val = monthly_earning_full[m]
+            X_all.append(val if val != 0.0 else avg_earning_used)
+
+        X_all_np = np.array(X_all).reshape(-1, 1)
+        print("Earnings for all months (used for prediction):", X_all)
+
+        # Predict for all 12 months
+        predicted = model.predict(X_all_np)
+        predicted_list = [float(p) for p in predicted]
+
+        return jsonify({
+            "success": True,
+            "year": year,
+            "train_X": X_train_list,
+            "train_Y": y_train_list,
+            "earnings": monthly_earning_full,
+            "expenses": monthly_expense_full,
+            "predicted_expenses": predicted_list
+        }), 200
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+def predict_expense_old(user_id):
+    """
     Returns predicted expense for the selected year's all month based on linear regression of past monthly existing expense.
     and also do this prediction based on the salary of the month and dont find then take average salary of the year and predict based on that.
     """

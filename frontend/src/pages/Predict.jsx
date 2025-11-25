@@ -49,9 +49,11 @@ const Predict = () => {
           // Normalize and combine data
           const months = Array.from({ length: 12 }, (_, i) => i + 1);
           const actualMap = data.expenses || {};
+          const earningsMap = data.earnings || {};
 
           const combined = months.map((m, i) => ({
             month: monthNames[m - 1],
+            earnings: earningsMap[m] || 0,
             actual: actualMap[m] || 0,
             predicted: Math.max(0, data.predicted_expenses[i]),
           }));
@@ -132,6 +134,14 @@ const Predict = () => {
                     dot={{ r: 4 }}
                     name="Predicted Expense"
                     strokeDasharray="5 5"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="earnings"
+                    stroke="#aa38aeff"
+                    strokeWidth={2.5}
+                    dot={{ r: 4 }}
+                    name="Earnings"
                   />
                 </LineChart>
               </ResponsiveContainer>
