@@ -106,7 +106,8 @@ const Footer = () => {
             © {currentYear}{" "}
             <strong className="text-sky-600 dark:text-teal-400">SmartExpense</strong>.
             All rights reserved. Developed by{" "}
-            <strong className="text-sky-600 dark:text-teal-400">Vishal Baghel</strong> and{" "}
+            <strong className="text-sky-600 dark:text-teal-400">Vishal Baghel</strong>,
+            <strong className="text-sky-600 dark:text-teal-400">Parshwa Shah</strong> and{" "}
             <strong className="text-teal-600 dark:text-sky-400">Krish Shah</strong>.
           </p>
 
