@@ -1,91 +1,433 @@
-# SmartExpense – Personal Finance Manager
+# SmartExpense 💸
 
-[![Live Demo](https://img.shields.io/badge/demo-online-green?style=for-the-badge)](https://smart-expense-beta.vercel.app/)
-[![License](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)](./LICENSE)
-[![Made with React](https://img.shields.io/badge/Frontend-React-blue?style=for-the-badge\&logo=react)]()
-[![Made with Flask](https://img.shields.io/badge/Backend-Flask-black?style=for-the-badge\&logo=flask)]()
-[![Postgres](https://img.shields.io/badge/Database-PostgreSQL-336791?style=for-the-badge\&logo=postgresql)]()
-
-SmartExpense helps you **track salaries, manage daily expenses, and organize them into categories** so you never lose sight of your money.
-
-🔗 **Live Demo** → [SmartExpense on Vercel](https://smart-expense-beta.vercel.app/)
+SmartExpense is a full-stack **AI-powered Personal Expense Management System** designed to help users track, analyze, predict, and optimize their financial spending. The system combines intuitive data visualization with machine learning insights to provide actionable financial intelligence.
 
 ---
 
-## 🚀 Features
+## 🚀 Project Overview
 
-✅ Add, edit & delete expenses
-✅ Organize expenses by categories (Food, Travel, Shopping, Others, etc.)
-✅ Track earning history & monthly summaries
-✅ Generate CSV reports of expenses
-✅ Dark/Light theme support
-✅ Responsive dashboard with charts
+SmartExpense allows users to:
+- Track earnings and expenses efficiently
+- Categorize spending
+- Upload bulk data using CSV files
+- Visualize financial trends through charts
+- Receive AI-based expense reduction recommendations
+- Predict future expenses using Machine Learning
+- Generate and email detailed PDF reports
 
----
-
-## 🛠 Tech Stack
-
-* **Frontend:** React + Vite + Tailwind
-* **Backend:** Flask (Python)
-* **Database:** PostgreSQL
-* **Deployment:** Vercel (Frontend) & Render/Heroku (Backend)
+This project is developed as a **college major project** with a strong focus on **scalability, clean architecture, and real-world use cases**.
 
 ---
 
-## 📦 Installation
+## 🧩 System Architecture
 
-Clone the repository:
+The application follows a **modular layered architecture**:
 
-```bash
-git clone https://github.com/your-username/SmartExpense.git
-cd SmartExpense
-```
-
-### Backend Setup (Flask)
-
-```bash
-cd backend
-pip install -r requirements.txt
-python app.py
-```
-
-### Frontend Setup (React + Vite)
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
+- Frontend (React + Tailwind)
+- Backend API (Flask)
+- Business Logic Layer
+- Data Access Layer
+- AI / ML Engine
+- Report Engine
+- Integration Services (OAuth, Email)
 
 ---
 
-## 📊 Database Schema
+## 🎨 Frontend (React + Tailwind CSS)
 
-* **users** → stores user info
-* **earning** → stores earning history
-* **expenses** → stores expense records
-* **categories** → predefined + custom categories
+### 🔹 Technologies Used
+- React.js
+- Tailwind CSS
+- ReCharts
+- Axios
+
+### 🔹 Frontend Features
+
+#### ✅ Authentication
+- Google OAuth Login
+- Classic Email & Password Login
+
+#### ✅ Expense Management
+- Add expense by date and category
+- View expenses with pagination
+- View latest expense records
+
+#### ✅ Earnings Management
+- Add monthly and yearly earnings
+- Bulk earning upload via CSV
+
+#### ✅ Data Visualization
+- Line Chart: Last 30 expense entries
+- Pie Chart: Current month category-wise expense
+- Bar Chart: Category-wise total expenses
+- Trend Chart: Earnings vs Expenses
+- Comparison Bar Chart: Monthly earning vs expense
+
+#### ✅ Reports
+- Interactive summary dashboards
+- Downloadable PDF reports
 
 ---
 
-## 📈 Screenshots
+## ⚙️ Backend (Flask)
 
-(Add screenshots/gifs of your app UI here for more attraction 👇)
-<img width="1830" height="755" alt="sc1" src="https://github.com/user-attachments/assets/db082e24-27fc-4c8a-a6f1-85d2236b0ec3" />
-<img width="1499" height="830" alt="sc2" src="https://github.com/user-attachments/assets/e1129a41-05b8-4a8e-abe8-21d6154c127e" />
+### 🔹 Technologies Used
+- Python
+- Flask
+- JWT / Token Authentication
+- SQL Database
+- Pandas
+- Scikit-learn
+
+### 🔹 Backend Features
+
+#### ✅ User Management
+- Register / Login
+- Token-based authentication
+- Google OAuth integration
+
+#### ✅ Expense & Earning APIs
+- Add, delete monthly/yearly expenses
+- Add earnings (single & bulk)
+- Category-based expense tracking
+
+#### ✅ CSV Upload Module
+- Upload earnings and expenses via CSV
+- Automatic validation and preprocessing
 
 ---
 
-## 🤝 Contributing
+## 🤖 AI & Machine Learning Features
 
-Pull requests are welcome! For major changes, please open an issue first to discuss what you’d like to improve.
+### 🔹 Expense Prediction (Linear Regression)
+
+- **Independent Variables**
+  - Current earning
+  - Past earnings
+- **Dependent Variable**
+  - Cumulative past expenses
+
+Predicts upcoming month’s total expense using **Linear Regression**.
 
 ---
 
-## 📄 License
+### 🔹 AI Expense Recommendation Engine
 
-This project is licensed under the [MIT License](./LICENSE).
+Uses priority-based category analysis:
+- Last Month → 65% weight
+- 2nd Last Month → 25% weight
+- 3rd Last Month → 10% weight
+
+Identifies high-spending categories and recommends areas to reduce expenses.
 
 ---
 
-Made with ❤️ by [VISHAL BAGHEL]
+## 📊 Analytics & Insights
+
+- Monthly expense summary by category
+- Yearly cumulative expense analysis
+- Latest expense records with pagination
+- Category-wise spending insights
+
+---
+
+## 📄 Report Generation
+
+- Generates PDF reports containing:
+  - Charts
+  - Expense summaries
+  - Earnings trends
+  - AI insights
+- Automatically emails the generated report to the user
+
+---
+
+## 🗂️ Core Entities
+
+- Person
+- Category
+- Expense
+- Earning
+
+Each entity is designed with clean relationships and modular service handling.
+
+---
+
+## 🔐 Security
+
+- Password hashing
+- Token-based authentication
+- Secure OAuth integration
+
+---
+
+## 🧪 Future Enhancements
+
+- Budget limit alerts
+- Mobile application
+- Advanced ML models (LSTM)
+- Multi-currency support
+- Export to Excel
+
+---
+
+## 👨‍💻 Contributors
+
+Developed by **SmartExpense Team** as a college project.
+
+---
+
+## 📌 Conclusion
+
+SmartExpense is not just a tracker — it’s a **smart financial assistant** that helps users understand, predict, and control their spending using **data visualization and AI**.
+
+---
+
+✨ *Track smart. Spend smarter.*AI / ML Engine
+
+Report Engine
+
+Integration Services (OAuth, Email)
+
+
+
+---
+
+🎨 Frontend (React + Tailwind CSS)
+
+🔹 Technologies Used
+
+React.js
+
+Tailwind CSS
+
+ReCharts
+
+Axios
+
+
+🔹 Frontend Features
+
+✅ Authentication
+
+Google OAuth Login
+
+Classic Email & Password Login
+
+
+✅ Expense Management
+
+Add expense by date and category
+
+View expenses with pagination
+
+View latest expense records
+
+
+✅ Earnings Management
+
+Add monthly and yearly earnings
+
+Bulk earning upload via CSV
+
+
+✅ Data Visualization
+
+Line Chart: Last 30 expense entries
+
+Pie Chart: Current month category‑wise expense
+
+Bar Chart: Category‑wise total expenses
+
+Trend Chart: Earnings vs Expenses
+
+Comparison Bar Chart: Monthly earning vs expense
+
+
+✅ Reports
+
+Interactive summary dashboards
+
+Downloadable PDF reports
+
+
+
+---
+
+⚙️ Backend (Flask)
+
+🔹 Technologies Used
+
+Python
+
+Flask
+
+Flask‑JWT / Token Authentication
+
+SQL Database
+
+Pandas
+
+Scikit‑learn
+
+
+🔹 Backend Features
+
+✅ User Management
+
+Register / Login
+
+Token‑based authentication
+
+Google OAuth integration
+
+
+✅ Expense & Earning APIs
+
+Add, delete monthly/yearly expenses
+
+Add earnings (single & bulk)
+
+Category‑based expense tracking
+
+
+✅ CSV Upload Module
+
+Upload earnings and expenses via CSV
+
+Automatic validation and preprocessing
+
+
+
+---
+
+🤖 AI & Machine Learning Features
+
+🔹 Expense Prediction (Linear Regression)
+
+Independent Variables:
+
+Current earning
+
+Past earnings
+
+
+Dependent Variable:
+
+Cumulative past expenses
+
+
+
+Predicts upcoming month’s total expense using Linear Regression.
+
+
+---
+
+🔹 AI Expense Recommendation Engine
+
+Uses priority‑based category analysis:
+
+Last Month → 65% weight
+
+2nd Last Month → 25% weight
+
+3rd Last Month → 10% weight
+
+
+Identifies high‑spending categories and recommends areas to reduce expenses.
+
+
+---
+
+📊 Analytics & Insights
+
+Monthly expense summary by category
+
+Yearly cumulative expense analysis
+
+Latest expense records with pagination
+
+Category‑wise spending insights
+
+
+
+---
+
+📄 Report Generation
+
+Generates PDF reports containing:
+
+Charts
+
+Expense summaries
+
+Earnings trends
+
+AI insights
+
+
+Automatically emails the generated report to the user
+
+
+
+---
+
+🗂️ Core Entities
+
+Person
+
+Category
+
+Expense
+
+Earning
+
+
+Each entity is designed with clean relationships and modular service handling.
+
+
+---
+
+🔐 Security
+
+Password hashing
+
+Token‑based authentication
+
+Secure OAuth integration
+
+
+
+---
+
+🧪 Future Enhancements
+
+Budget limit alerts
+
+Mobile application
+
+Advanced ML models (LSTM)
+
+Multi‑currency support
+
+Export to Excel
+
+
+
+---
+
+👨‍💻 Contributors
+
+Developed by SmartExpense Team as a college project.
+
+
+---
+
+📌 Conclusion
+
+SmartExpense is not just a tracker — it’s a smart financial assistant that helps users understand, predict, and control their spending using data visualization and AI.
+
+
+---
+
+✨ Track smart. Spend smarter.
